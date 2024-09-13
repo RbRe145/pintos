@@ -134,13 +134,39 @@ pintos_init (void)
     run_actions (argv);
   } else {
     // TODO: no command line passed to kernel. Run interactively 
+    char new_line[100];
+    while(1){
+      printf("PKUOS> ");
+      uint8_t key_input;
+       // copy new line in the buffer, 到时候打断点去input.c中看一下吧
+      int i=0;
+      memset(new_line, '\0', 100);
+      while(1){
+        key_input = input_getc();
+        printf("%c", key_input);
+        if(key_input == '\n') 
+          break;
+        new_line[i++] = key_input;
+      }
+      if (strcmp(new_line, "whoami") == 0) {
+        printf("%s\n", "I AM NUT");
+      }
+      else if (strcmp(new_line, "exit") == 0) {
+        printf("Exiting monitor...\n");
+        break;
+      }
+      else {
+        printf("invalid command\n");
+      }
+      // console_print_stats();
+    }
   }
 
   /* Finish up. */
   shutdown ();
   thread_exit ();
 }
-
+
 /** Clear the "BSS", a segment that should be initialized to
    zeros.  It isn't actually stored on disk or zeroed by the
    kernel loader, so we have to zero it ourselves.

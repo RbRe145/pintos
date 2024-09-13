@@ -50,3 +50,4 @@ input_full (void)
   ASSERT (intr_get_level () == INTR_OFF);
   return intq_full (&buffer);
 }
+
