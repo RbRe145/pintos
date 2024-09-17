@@ -143,10 +143,24 @@ pintos_init (void)
       memset(new_line, '\0', 100);
       while(1){
         key_input = input_getc();
-        printf("%c", key_input);
-        if(key_input == '\n') 
+        if (key_input == '\b' || key_input == 127) {
+          if (i > 0) {
+            i--;
+            new_line[i] = '\0';
+            // 在控制台上擦除字符：移动光标、覆盖为空格、再移动光标
+            printf("\b \b");
+          }
+        }
+        // 处理回车键
+        else if (key_input == '\n') {
+          printf("\n");
           break;
-        new_line[i++] = key_input;
+        }
+        else {
+          new_line[i++] = key_input;
+          new_line[i] = '\0'; // 保持字符串以'\0'结尾
+          printf("%c", key_input);
+        }
       }
       if (strcmp(new_line, "whoami") == 0) {
         printf("%s\n", "I AM NUT");
