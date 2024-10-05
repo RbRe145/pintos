@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 
+#include "synch.h"
 /** States in a thread's life cycle. */
 enum thread_status
   {
@@ -80,6 +81,13 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+
+struct sleep_info {
+    int64_t wake_up_time;        // 唤醒时间（基于 timer_ticks）
+    struct semaphore sema;       // 用于阻塞和唤醒线程
+    struct list_elem elem;       // 链表元素，用于加入睡眠列表
+};
+
 struct thread
   {
     /* Owned by thread.c. */
@@ -93,6 +101,8 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /**< List element. */
 
+   struct sleep_info info;
+   
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /**< Page directory. */

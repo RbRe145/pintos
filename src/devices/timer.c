@@ -30,6 +30,7 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+struct list sleep_info_list;
 /** Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -37,6 +38,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init(&sleep_info_list);
 }
 
 /** Calibrates loops_per_tick, used to implement brief delays. */
@@ -84,16 +86,31 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
+static bool
+compare_wakeuptime(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+    struct sleep_info *sa = list_entry(a, struct sleep_info, elem);
+    struct sleep_info *sb = list_entry(b, struct sleep_info, elem);
+    return sa->wake_up_time < sb->wake_up_time;
+}
 /** Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
-
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  int64_t start = timer_ticks ();
+  struct sleep_info* s_info = &thread_current()->info;
+  s_info->wake_up_time = start + ticks;
+  enum intr_level old_level = intr_disable();
+
+  if (timer_elapsed (start) < ticks) 
+  {
+    list_insert_ordered(&sleep_info_list, &s_info->elem, compare_wakeuptime, NULL);
+    sema_down(&s_info->sema);
+  }
+  intr_set_level(old_level);
+
 }
 
 /** Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -172,6 +189,19 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+
+  enum intr_level old_level = intr_disable();
+  while (!list_empty (&sleep_info_list))
+  {
+    struct sleep_info *s_info = list_entry (list_front (&sleep_info_list), struct sleep_info, elem);
+    if (s_info->wake_up_time <= ticks){
+      list_pop_front (&sleep_info_list);
+      sema_up (&s_info->sema);
+    }else{
+      break;
+    } 
+  }
+  intr_set_level(old_level);
 }
 
 /** Returns true if LOOPS iterations waits for more than one timer

@@ -42,6 +42,7 @@ struct sleep_thread
     int id;                     /**< Sleeper ID. */
     int duration;               /**< Number of ticks to sleep. */
     int iterations;             /**< Iterations counted so far. */
+    
   };
 
 static void sleeper (void *);
@@ -55,6 +56,7 @@ test_sleep (int thread_cnt, int iterations)
   int *output, *op;
   int product;
   int i;
+
 
   /* This test does not work with the MLFQS. */
   ASSERT (!thread_mlfqs);
