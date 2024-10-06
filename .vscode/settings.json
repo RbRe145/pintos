@@ -2,6 +2,7 @@
     "files.associations": {
         "synch.h": "c",
         "timer.h": "c",
-        "thread.h": "c"
+        "thread.h": "c",
+        "interrupt.h": "c"
     }
 }
