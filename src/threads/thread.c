@@ -203,6 +203,9 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  // 如果t的priority大于当前线程的priority, yield一下
+  if (t->priority > thread_current()->priority) 
+    thread_yield();
   return tid;
 }
 
@@ -254,7 +257,6 @@ thread_unblock (struct thread *t)
   
   list_push_back(&ready_list, &t->elem);
   // list_insert_ordered (&ready_list, &t->elem, thread_priority_compare, NULL);
-  // printf("ready_list after insert: %d\n", list_size(&ready_list));
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
