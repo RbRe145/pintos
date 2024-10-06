@@ -226,7 +226,7 @@ thread_block (void)
 }
 
 /* 比较两个线程的优先级，返回优先级较高的线程 */
-static bool
+bool
 thread_priority_compare (const struct list_elem *a,
                          const struct list_elem *b,
                          void *aux UNUSED)
