@@ -195,7 +195,7 @@ thread_create (const char *name, int priority,
   ef = alloc_frame (t, sizeof *ef);
   ef->eip = (void (*) (void)) kernel_thread;
 
-  /* Stack frame for switch_threads(). */
+  /* Stack frame for swtitch_threads(). */
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
@@ -222,6 +222,18 @@ thread_block (void)
   schedule ();
 }
 
+/* 比较两个线程的优先级，返回优先级较高的线程 */
+static bool
+thread_priority_compare (const struct list_elem *a,
+                         const struct list_elem *b,
+                         void *aux UNUSED)
+{
+  const struct thread *ta = list_entry(a, struct thread, elem);
+  const struct thread *tb = list_entry(b, struct thread, elem);
+  
+  return ta->priority > tb->priority;
+}
+
 /** Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
@@ -239,11 +251,13 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  
+  list_push_back(&ready_list, &t->elem);
+  // list_insert_ordered (&ready_list, &t->elem, thread_priority_compare, NULL);
+  // printf("ready_list after insert: %d\n", list_size(&ready_list));
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
-
 /** Returns the name of the running thread. */
 const char *
 thread_name (void) 
@@ -337,7 +351,26 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  enum intr_level old_level = intr_disable();
+  int old_priority = thread_current()->priority;
+  thread_current()->priority = new_priority;
+
+  // 如果新优先级低于旧优先级，需要检查是否应该让出 CPU
+  if (new_priority < old_priority)
+  {
+    // 检查 ready_list 中是否有优先级更高的线程
+    if (!list_empty(&ready_list))
+    {
+      struct thread *highest_ready = list_entry(list_front(&ready_list), struct thread, elem);
+      if (highest_ready->priority > new_priority)
+      {
+        // 如果有更高优先级的就绪线程，则让出 CPU
+        thread_yield();
+      }
+    }
+  }
+
+  intr_set_level(old_level);
 }
 
 /** Returns the current thread's priority. */
@@ -377,7 +410,7 @@ thread_get_recent_cpu (void)
   /* Not yet implemented. */
   return 0;
 }
-
+
 /** Idle thread.  Executes when no other thread is ready to run.
 
    The idle thread is initially put on the ready list by
@@ -426,7 +459,7 @@ kernel_thread (thread_func *function, void *aux)
   function (aux);       /**< Execute the thread function. */
   thread_exit ();       /**< If function() returns, kill the thread. */
 }
-
+
 /** Returns the running thread. */
 struct thread *
 running_thread (void) 
@@ -582,7 +615,7 @@ allocate_tid (void)
 
   return tid;
 }
-
+
 /** Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
