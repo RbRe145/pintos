@@ -178,7 +178,34 @@ lock_init (struct lock *lock)
   ASSERT (lock != NULL);
 
   lock->holder = NULL;
+  list_init(&lock->waiting_threads_list);
   sema_init (&lock->semaphore, 1);
+}
+
+
+bool
+lock_priority_compare(const struct list_elem *a, const struct list_elem *b, void *aux){
+  struct lock *lock_a = list_entry(a, struct lock, held_locks_elem);
+  struct lock *lock_b = list_entry(b, struct lock, held_locks_elem);
+  
+  int priority_a = 0;
+  int priority_b = 0;
+
+  // 获取lock_a等待队列中最高优先级
+  if (!list_empty(&lock_a->waiting_threads_list)) {
+    struct thread *highest_a = list_entry(list_front(&lock_a->waiting_threads_list),
+                                          struct thread, elem);
+    priority_a = highest_a->priority;
+  }
+
+  // 获取lock_b等待队列中最高优先级
+  if (!list_empty(&lock_b->waiting_threads_list)) {
+    struct thread *highest_b = list_entry(list_front(&lock_b->waiting_threads_list),
+                                          struct thread, elem);
+    priority_b = highest_b->priority;
+  }
+
+  return priority_a > priority_b;
 }
 
 /** Acquires LOCK, sleeping until it becomes available if
@@ -196,7 +223,21 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  struct thread *current = thread_current();
+  if(lock->holder != NULL){
+    current->waiting_on_lock = lock;
+    // reset priority of lock holder
+    lock->holder->priority = (current->priority > lock->holder->priority) ? current->priority : lock->holder->priority;
+    list_insert_ordered(&lock->waiting_threads_list, &current->elem, thread_priority_compare, NULL);
+  }
+
   sema_down (&lock->semaphore);
+  // after sema_down, current thread is the holder of the lock
+  if (!list_empty(&lock->waiting_threads_list))
+    list_pop_front(&lock->waiting_threads_list);
+  if (!list_empty(&current->held_locks_list))
+    list_insert_ordered(&current->held_locks_list, &lock->held_locks_elem, lock_priority_compare, NULL);
+  current->waiting_on_lock = NULL;
   lock->holder = thread_current ();
 }
 

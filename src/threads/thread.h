@@ -102,6 +102,10 @@ struct thread
     struct list_elem elem;              /**< List element. */
 
    struct sleep_info info;
+
+   int original_priority;
+   struct lock *waiting_on_lock;
+   struct list held_locks_list;
    
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
