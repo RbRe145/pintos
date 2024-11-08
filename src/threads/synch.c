@@ -68,7 +68,11 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
+      // list_push_back (&sema->waiters, &thread_current ()->elem);
+      list_insert_ordered(&sema->waiters, 
+                   &thread_current()->elem,
+                   thread_priority_compare,
+                   NULL);
       thread_block ();
     }
   sema->value--;
@@ -215,14 +219,14 @@ lock_acquire (struct lock *lock)
     // reset priority of lock holder
     lock->holder->priority = (current->priority > lock->holder->priority)? current->priority : lock->holder->priority;
     lock->max_priority = (current->priority > lock->max_priority)? current->priority : lock->max_priority;
-    list_insert_ordered(&lock->waiting_threads_list, &current->elem, thread_priority_compare, NULL);
+    // list_insert_ordered(&lock->waiting_threads_list, &current->elem, thread_priority_compare, NULL);
   }
 
   sema_down (&lock->semaphore);
   // after sema_down, current thread is the holder of the lock
 
-  if (!list_empty(&lock->waiting_threads_list))
-    list_pop_front(&lock->waiting_threads_list);
+  // if (!list_empty(&lock->waiting_threads_list))
+  //   list_pop_front(&lock->waiting_threads_list);
 
   current->waiting_on_lock = NULL;
   lock->holder = current;
@@ -271,7 +275,7 @@ lock_release (struct lock *lock)
     cur->priority = (cur->priority > highest_lock->max_priority)? cur->priority : highest_lock->max_priority;
   }
   lock->holder = NULL;
-  sema_up (&lock->semaphore);
+  sema_up(&lock->semaphore);
 
   thread_yield();
 }

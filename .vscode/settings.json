@@ -3,6 +3,7 @@
         "synch.h": "c",
         "timer.h": "c",
         "thread.h": "c",
-        "interrupt.h": "c"
+        "interrupt.h": "c",
+        "list.h": "c"
     }
 }
