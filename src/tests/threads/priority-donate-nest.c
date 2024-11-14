@@ -45,9 +45,11 @@ test_priority_donate_nest (void)
   locks.b = &b;
   thread_create ("medium", PRI_DEFAULT + 1, medium_thread_func, &locks);
   thread_yield ();
+  // Low thread is main thread, with donated priority PRI_DEFAULT + 1 from medium thread
   msg ("Low thread should have priority %d.  Actual priority: %d.",
        PRI_DEFAULT + 1, thread_get_priority ());
-
+  // Low thread get temp priority and continue to create high thread
+  // without release lock a, so medium thread is blocked on lock a
   thread_create ("high", PRI_DEFAULT + 2, high_thread_func, &b);
   thread_yield ();
   msg ("Low thread should have priority %d.  Actual priority: %d.",
@@ -86,7 +88,7 @@ static void
 high_thread_func (void *lock_) 
 {
   struct lock *lock = lock_;
-
+  // tries for lock b, and donate high priority to medium thread
   lock_acquire (lock);
   msg ("High thread got the lock.");
   lock_release (lock);

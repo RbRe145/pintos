@@ -32,6 +32,8 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+#define MAX_DONATION_DEPTH 8  // 添加到文件开头的常量定义部分
+
 /** Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -160,7 +162,7 @@ sema_test_helper (void *sema_)
       sema_up (&sema[1]);
     }
 }
-
+
 /** Initializes LOCK.  A lock can be held by at most a single
    thread at any given time.  Our locks are not "recursive", that
    is, it is an error for the thread currently holding a lock to
@@ -216,18 +218,26 @@ lock_acquire (struct lock *lock)
   struct thread *current = thread_current();
   if(lock->holder != NULL){
     current->waiting_on_lock = lock;
-    // reset priority of lock holder
-    lock->holder->priority = (current->priority > lock->holder->priority)? current->priority : lock->holder->priority;
-    lock->max_priority = (current->priority > lock->max_priority)? current->priority : lock->max_priority;
-    // list_insert_ordered(&lock->waiting_threads_list, &current->elem, thread_priority_compare, NULL);
+    
+    // 处理嵌套捐赠，限制最大深度
+    struct thread *holder = lock->holder;
+    int depth = 0;
+    while (holder != NULL && depth < MAX_DONATION_DEPTH) {
+      // 更新持有锁的线程优先级
+      if (current->priority > holder->priority)
+        holder->priority = current->priority;
+      
+      // 继续向上追溯等待链
+      holder = holder->waiting_on_lock != NULL ? 
+               holder->waiting_on_lock->holder : NULL;
+      depth++;
+    }
+
+    lock->max_priority = (current->priority > lock->max_priority)? 
+                        current->priority : lock->max_priority;
   }
 
   sema_down (&lock->semaphore);
-  // after sema_down, current thread is the holder of the lock
-
-  // if (!list_empty(&lock->waiting_threads_list))
-  //   list_pop_front(&lock->waiting_threads_list);
-
   current->waiting_on_lock = NULL;
   lock->holder = current;
   list_insert_ordered(&current->held_locks_list, &lock->held_locks_elem, lock_priority_compare, NULL);
@@ -290,7 +300,7 @@ lock_held_by_current_thread (const struct lock *lock)
 
   return lock->holder == thread_current ();
 }
-
+
 /** One semaphore in a list. */
 struct semaphore_elem 
   {
